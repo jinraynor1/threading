@@ -1,0 +1,19 @@
+{
+  "name": "jinraynor1/threading",
+  "description": "simulate threads",
+  "authors": [
+    {
+      "name": "Jimmy Atauje Hidalgo",
+      "email": "jimmy.addiction@gmail.com"
+    }
+  ],
+  "minimum-stability": "dev",
+  "require": {
+    "php": ">=5.3.0"
+  },
+  "autoload": {
+    "psr-0": {
+      "Pcntl": "src/"
+    }
+  }
+}
