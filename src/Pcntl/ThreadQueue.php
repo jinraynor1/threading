@@ -2,9 +2,7 @@
 namespace Pcntl;
 /*
   Adds parallel tasks to a queue.
-  
   tick() must be called regularly, that arranges addition of new jobs and removal of closed threads.
-
   */
 
 
