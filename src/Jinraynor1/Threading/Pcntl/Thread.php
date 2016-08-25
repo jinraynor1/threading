@@ -1,5 +1,5 @@
 <?php
-namespace Pcntl;
+namespace Jinraynor1\Threading\Pcntl;
 
 /**
  * Implements threading in PHP
