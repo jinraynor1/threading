@@ -1,6 +1,7 @@
 {
   "name": "jinraynor1/threading",
   "description": "simulate threads",
+  "license": "MIT",
   "authors": [
     {
       "name": "Jimmy Atauje Hidalgo",
