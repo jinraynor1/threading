@@ -1,4 +1,5 @@
 <?php
+
 namespace Jinraynor1\Threading\Pcntl;
 
 /**
@@ -26,7 +27,7 @@ namespace Jinraynor1\Threading\Pcntl;
 class Thread
 {
     const FUNCTION_NOT_CALLABLE = 10;
-    const COULD_NOT_FORK        = 15;
+    const COULD_NOT_FORK = 15;
     /**
      * Possible errors
      *
@@ -34,7 +35,7 @@ class Thread
      */
     private $_errors = array(
         Thread::FUNCTION_NOT_CALLABLE => 'You must specify a valid function name that can be called from the current scope.',
-        Thread::COULD_NOT_FORK        => 'pcntl_fork() returned a status of -1. No new process was created'
+        Thread::COULD_NOT_FORK => 'pcntl_fork() returned a status of -1. No new process was created'
     );
     /**
      * Callback for the function that should run as a separate thread
@@ -51,14 +52,23 @@ class Thread
 
 
     /**
+     * Hold pair of sockets to pass results
+     * @var array
+     */
+    private $sockets = array();
+
+
+    /**
      * Exits with error
      *
      * @return void
      */
 
-    private function fatalError($errorCode){
-        throw new \Exception( $this->getError($errorCode) );
+    private function fatalError($errorCode)
+    {
+        throw new \Exception($this->getError($errorCode));
     }
+
     /**
      * Checks if threading is supported by the current PHP configuration
      *
@@ -69,26 +79,31 @@ class Thread
         $required_functions = array(
             'pcntl_fork',
         );
-        foreach ( $required_functions as $function ) {
-            if ( !function_exists($function) ) {
+        foreach ($required_functions as $function) {
+            if (!function_exists($function)) {
                 return false;
             }
         }
         return true;
     }
+
     /**
      * Class constructor - you can pass
      * the callback function as an argument
      *
      * @param callback $runnable Callback reference
      */
-    public function __construct( $runnable = null )
+    public function __construct($runnable = null, $message_length)
     {
-        if(!Thread::isAvailable() )throw new \Exception("Threads not supported");
-        if ( $runnable !== null ) {
+        $this->message_length = $message_length;
+
+        if (!Thread::isAvailable()) throw new \Exception("Threads not supported");
+
+        if ($runnable !== null) {
             $this->setRunnable($runnable);
         }
     }
+
     /**
      * Sets the callback
      *
@@ -96,14 +111,15 @@ class Thread
      *
      * @return callback
      */
-    public function setRunnable( $runnable )
+    public function setRunnable($runnable)
     {
-        if ( self::isRunnableOk($runnable) ) {
+        if (self::isRunnableOk($runnable)) {
             $this->runnable = $runnable;
         } else {
             $this->fatalError(Thread::FUNCTION_NOT_CALLABLE);
         }
     }
+
     /**
      * Gets the callback
      *
@@ -113,6 +129,7 @@ class Thread
     {
         return $this->runnable;
     }
+
     /**
      * Checks if the callback is ok (the function/method
      * is runnable from the current context)
@@ -123,10 +140,11 @@ class Thread
      *
      * @return boolean
      */
-    public static function isRunnableOk( $runnable )
+    public static function isRunnableOk($runnable)
     {
-        return ( is_callable($runnable) );
+        return (is_callable($runnable));
     }
+
     /**
      * Returns the process id (pid) of the simulated thread
      *
@@ -136,6 +154,7 @@ class Thread
     {
         return $this->_pid;
     }
+
     /**
      * Checks if the child thread is alive
      *
@@ -144,65 +163,82 @@ class Thread
     public function isAlive()
     {
         $pid = pcntl_waitpid($this->_pid, $status, WNOHANG);
-        return ( $pid === 0 );
+        $this->result = unserialize(trim(socket_read($this->sockets[1], $this->message_length)));
+        socket_close($this->sockets[1]);
+
+        return ($pid === 0);
     }
+
     /**
      * Starts the thread, all the parameters are
      * passed to the callback function
      *
      * @return void
      */
-    public function start()
+    public function start($arguments)
     {
+        if (socket_create_pair(AF_UNIX, SOCK_STREAM, 0, $this->sockets) === false) {
+            throw  new \Exception(socket_strerror(socket_last_error()));
+        }
+
         $pid = @pcntl_fork();
-        if ( $pid == -1 ) {
+        if ($pid == -1) {
             $this->fatalError(Thread::COULD_NOT_FORK);
         }
-        if ( $pid ) {
+        if ($pid) {
             // parent
+
             $this->_pid = $pid;
         } else {
             // child
-            pcntl_signal(SIGTERM, array( $this, 'handleSignal' ));
-            $arguments = func_get_args();
-            if ( !empty($arguments) ) {
-                call_user_func_array($this->runnable, $arguments);
+            pcntl_signal(SIGTERM, array($this, 'handleSignal'));
+
+            if (!empty($arguments)) {
+                $results = call_user_func_array($this->runnable, $arguments);
             } else {
-                call_user_func($this->runnable);
+                $results = call_user_func($this->runnable);
             }
-            exit( 0 );
+
+            $data = serialize($results);
+            socket_write($this->sockets[0], str_pad($data, $this->message_length), $this->message_length);
+            socket_close($this->sockets[0]);
+
+            exit(0);
         }
     }
+
     /**
      * Attempts to stop the thread
      * returns true on success and false otherwise
      *
      * @param integer $signal SIGKILL or SIGTERM
-     * @param boolean $wait   Wait until child has exited
+     * @param boolean $wait Wait until child has exited
      *
      * @return void
      */
-    public function stop( $signal = SIGKILL, $wait = false )
+    public function stop($signal = SIGKILL, $wait = false)
     {
-        if ( $this->isAlive() ) {
+        if ($this->isAlive()) {
             posix_kill($this->_pid, $signal);
-            if ( $wait ) {
+            if ($wait) {
                 pcntl_waitpid($this->_pid, $status = 0);
             }
         }
     }
+
     /**
      * Alias of stop();
      *
      * @param integer $signal SIGKILL or SIGTERM
-     * @param boolean $wait   Wait until child has exited
+     * @param boolean $wait Wait until child has exited
      *
      * @return void
      */
-    public function kill( $signal = SIGKILL, $wait = false )
+    public function kill($signal = SIGKILL, $wait = false)
     {
         return $this->stop($signal, $wait);
     }
+
     /**
      * Gets the error's message based on its id
      *
@@ -210,14 +246,15 @@ class Thread
      *
      * @return string
      */
-    public function getError( $code )
+    public function getError($code)
     {
-        if ( isset( $this->_errors[$code] ) ) {
+        if (isset($this->_errors[$code])) {
             return $this->_errors[$code];
         } else {
             return "No such error code $code ! Quit inventing errors!!!";
         }
     }
+
     /**
      * Signal handler
      *
@@ -225,11 +262,11 @@ class Thread
      *
      * @return void
      */
-    protected function handleSignal( $signal )
+    protected function handleSignal($signal)
     {
-        switch( $signal ) {
+        switch ($signal) {
             case SIGTERM:
-                exit( 0 );
+                exit(0);
                 break;
         }
     }

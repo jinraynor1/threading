@@ -1,4 +1,27 @@
-# threads
-simulate threads
+# Threads (fork)
+simulate threads using pcntl posix 
 
-Pcntl part taken from http://blog.motane.lu/2009/01/02/multithreading-in-php/
+
+* Features:
+  * Can set queue size
+  * Can pass messages from childs to parent 
+  
+# Example
+```php
+$queue = new ThreadQueue(function ($number) {
+            return pow($number, 2);
+
+});
+
+
+$queue->add(1);
+$queue->add(3);
+
+
+$queue->wait();
+$results = $queue->results();
+$sum = array_sum($results);
+
+// $sums now holds 9
+
+```
