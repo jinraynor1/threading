@@ -13,6 +13,8 @@ $queue = new ThreadQueue(function ($number) {
 
 });
 
+$queue->enableMessaging(true);
+
 
 $queue->add(1);
 $queue->add(3);

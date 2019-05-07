@@ -56,6 +56,22 @@ class Thread
      * @var array
      */
     private $sockets = array();
+    /**
+     *
+     * @var bool
+     */
+    private $enable_messaging;
+    /**
+     * Size of message
+     * @var integet
+     */
+    private $message_length;
+
+    /**
+     * Results when messaging is enabled
+     * @var
+     */
+    public $result = null;
 
 
     /**
@@ -93,15 +109,16 @@ class Thread
      *
      * @param callback $runnable Callback reference
      */
-    public function __construct($runnable = null, $message_length)
+    public function __construct($runnable = null, $enable_messaging, $message_length)
     {
-        $this->message_length = $message_length;
 
         if (!Thread::isAvailable()) throw new \Exception("Threads not supported");
 
         if ($runnable !== null) {
             $this->setRunnable($runnable);
         }
+        $this->enable_messaging = $enable_messaging;
+        $this->message_length = $message_length;
     }
 
     /**
@@ -163,8 +180,11 @@ class Thread
     public function isAlive()
     {
         $pid = pcntl_waitpid($this->_pid, $status, WNOHANG);
-        $this->result = unserialize(trim(socket_read($this->sockets[1], $this->message_length)));
-        socket_close($this->sockets[1]);
+
+        if ($this->enable_messaging && $pid !== 0) {
+            $this->result = unserialize(trim(socket_read($this->sockets[1], $this->message_length)));
+            socket_close($this->sockets[1]);
+        }
 
         return ($pid === 0);
     }
@@ -177,7 +197,8 @@ class Thread
      */
     public function start($arguments)
     {
-        if (socket_create_pair(AF_UNIX, SOCK_STREAM, 0, $this->sockets) === false) {
+
+        if ($this->enable_messaging && socket_create_pair(AF_UNIX, SOCK_STREAM, 0, $this->sockets) === false) {
             throw  new \Exception(socket_strerror(socket_last_error()));
         }
 
@@ -199,9 +220,11 @@ class Thread
                 $results = call_user_func($this->runnable);
             }
 
-            $data = serialize($results);
-            socket_write($this->sockets[0], str_pad($data, $this->message_length), $this->message_length);
-            socket_close($this->sockets[0]);
+            if ($this->enable_messaging) {
+                $data = serialize($results);
+                socket_write($this->sockets[0], str_pad($data, $this->message_length), $this->message_length);
+                socket_close($this->sockets[0]);
+            }
 
             exit(0);
         }

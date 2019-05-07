@@ -20,6 +20,10 @@ class ThreadQueue
     public $queueSize;        // number of parallel tasks. public, to make it variable run-time.
     private $results;
     private $message_length;
+    /**
+     * @var bool
+     */
+    private $enable_messaging;
 
     /**
      *    Constructor
@@ -28,12 +32,20 @@ class ThreadQueue
      * @param integer $queueSize number of parallel tasks
      */
 
-    public function __construct($callable, $queueSize = ThreadQueue::DEFAULT_QUEUE_SIZE, $message_length = ThreadQueue::MESSAGE_LENGTH)
+    public function __construct($callable,
+                                $queueSize = ThreadQueue::DEFAULT_QUEUE_SIZE)
     {
         if (!is_callable($callable)) throw new \Exception("$callable is not callable.");
         $this->callable = $callable;
         $this->queueSize = $queueSize;
+
+    }
+
+    public function enableMessaging($enable_messaging = false,
+                                    $message_length = ThreadQueue::MESSAGE_LENGTH)
+    {
         $this->message_length = $message_length;
+        $this->enable_messaging = $enable_messaging;
     }
 
 
@@ -78,7 +90,7 @@ class ThreadQueue
         $this->cleanup();
 
         if ((count($this->threads) < $this->queueSize) && count($this->jobs)) {
-            $this->threads[] = $szal = new Thread($this->callable, $this->message_length);
+            $this->threads[] = $szal = new Thread($this->callable, $this->enable_messaging, $this->message_length);
             $szal->start(array_shift($this->jobs));
         }
 

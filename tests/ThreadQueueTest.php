@@ -15,6 +15,8 @@ class ThreadQueueTest extends TestCase
 
         });
 
+        $queue->enableMessaging(true);
+
 
         $queue->add(1);
         $queue->add(3);
@@ -25,6 +27,30 @@ class ThreadQueueTest extends TestCase
         $sum = array_sum($results);
         $this->assertEquals(10, $sum);
 
+
+    }
+
+    public function testManyThreads()
+    {
+        $queue = new ThreadQueue(function ($number) {
+            return $number;
+
+        }, 20);
+
+        $queue->enableMessaging(true);
+
+
+        for ($i = 0; $i <= 100; $i++ ) {
+            $queue->add($i);
+        }
+
+
+        $queue->wait();
+        $results = $queue->results();
+        $sum = array_sum($results);
+
+
+        $this->assertEquals(5050, $sum);
 
     }
 }
